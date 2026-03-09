@@ -567,8 +567,19 @@ HAL_StatusTypeDef HAL_RCC_OscConfig(const RCC_OscInitTypeDef  *pRCC_OscInitStruc
            (HCLK) and the supply voltage of the device */
         if (pRCC_OscInitStruct->MSIClockRange > __HAL_RCC_GET_MSI_RANGE())
         {
-          /* Decrease number of wait states update if necessary */
-          /* Only possible when MSI is the System clock source  */
+          /* Keep current flash latency when decreasing sysclk frequency
+           * (i.e. increasing MIS clock range). Using more wait state than
+           * needed is not harmful. As a reminder, higher sysclk frequency
+           * require more wait states for flash latency.
+           */
+
+          /* Selects the Multiple Speed oscillator (MSI) clock range */
+          __HAL_RCC_MSI_RANGE_CONFIG(pRCC_OscInitStruct->MSIClockRange);
+          /* Adjusts the Multiple Speed oscillator (MSI) calibration value */
+          __HAL_RCC_MSI_CALIBRATIONVALUE_ADJUST((pRCC_OscInitStruct->MSICalibrationValue), \
+                                                (pRCC_OscInitStruct->MSIClockRange));
+
+          /* set correct flash latency */
           if (sysclk_source == RCC_SYSCLKSOURCE_STATUS_MSI)
           {
             if (RCC_SetFlashLatencyFromMSIRange(pRCC_OscInitStruct->MSIClockRange) != HAL_OK)
@@ -576,22 +587,13 @@ HAL_StatusTypeDef HAL_RCC_OscConfig(const RCC_OscInitTypeDef  *pRCC_OscInitStruc
               return HAL_ERROR;
             }
           }
-
-          /* Selects the Multiple Speed oscillator (MSI) clock range */
-          __HAL_RCC_MSI_RANGE_CONFIG(pRCC_OscInitStruct->MSIClockRange);
-          /* Adjusts the Multiple Speed oscillator (MSI) calibration value */
-          __HAL_RCC_MSI_CALIBRATIONVALUE_ADJUST((pRCC_OscInitStruct->MSICalibrationValue), \
-                                                (pRCC_OscInitStruct->MSIClockRange));
         }
         else
         {
-          /* Else, keep current flash latency while decreasing applies */
-          /* Selects the Multiple Speed oscillator (MSI) clock range */
-          __HAL_RCC_MSI_RANGE_CONFIG(pRCC_OscInitStruct->MSIClockRange);
-          /* Adjusts the Multiple Speed oscillator (MSI) calibration value */
-          __HAL_RCC_MSI_CALIBRATIONVALUE_ADJUST((pRCC_OscInitStruct->MSICalibrationValue), \
-                                                (pRCC_OscInitStruct->MSIClockRange));
-
+          /* When increasing sysclk frequency (ie. decreasing MSI clock range),
+           * the number of wait state for flash latency must be increased first.
+           * Otherwise flash reads/writes may fail.
+           */
           if (sysclk_source == RCC_SYSCLKSOURCE_STATUS_MSI)
           {
             if (RCC_SetFlashLatencyFromMSIRange(pRCC_OscInitStruct->MSIClockRange) != HAL_OK)
@@ -599,6 +601,12 @@ HAL_StatusTypeDef HAL_RCC_OscConfig(const RCC_OscInitTypeDef  *pRCC_OscInitStruc
               return HAL_ERROR;
             }
           }
+
+          /* Selects the Multiple Speed oscillator (MSI) clock range */
+          __HAL_RCC_MSI_RANGE_CONFIG(pRCC_OscInitStruct->MSIClockRange);
+          /* Adjusts the Multiple Speed oscillator (MSI) calibration value */
+          __HAL_RCC_MSI_CALIBRATIONVALUE_ADJUST((pRCC_OscInitStruct->MSICalibrationValue), \
+                                                (pRCC_OscInitStruct->MSIClockRange));
         }
 
         /* Update the SystemCoreClock global variable */
